@@ -1,1 +1,16 @@
+langchain_core
+python-dotenv
 streamlit
+langchain_community
+langserve
+uvicorn
+sse_starlette
+groq
+langchain-groq
+wikipedia
+arxiv
+langchainhub
+sentence_transformers
+PyPDF2
+langchain-objectbox
+langchain
