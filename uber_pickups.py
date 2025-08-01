@@ -1,36 +1,76 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
+from langchain_groq import ChatGroq  # Interface to use Groq models
 
-st.title('Uber pickups in NYC')
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage, AIMessage
+from dotenv import load_dotenv
 
-DATE_COLUMN = 'date/time'
-DATA_URL = ('https://s3-us-west-2.amazonaws.com/'
-            'streamlit-demo-data/uber-raw-data-sep14.csv.gz')
+api_key= st.secrets["api_key"]
 
-@st.cache_data
-def load_data(nrows):
-    data = pd.read_csv(DATA_URL, nrows=nrows)
-    lowercase = lambda x: str(x).lower()
-    data.rename(lowercase, axis='columns', inplace=True)
-    data[DATE_COLUMN] = pd.to_datetime(data[DATE_COLUMN])
-    return data
+# Note: It's recommended to put this key in a .env file for security
 
-data_load_state = st.text('Loading data...')
-data = load_data(10000)
-data_load_state.text("Done! (using st.cache_data)")
+# Initialize the Groq language model
+llm = ChatGroq(api_key=api_key,
+               model="llama-3.3-70b-versatile")  # Llama 3.3 70B model for high-quality responses
 
-if st.checkbox('Show raw data'):
-    st.subheader('Raw data')
-    st.write(data)
+# System prompt that defines the AI assistant's behavior
+SYSTEM_PROMPT = """
+Speak always in French"""
 
-st.subheader('Number of pickups by hour')
-hist_values = np.histogram(data[DATE_COLUMN].dt.hour, bins=24, range=(0,24))[0]
-st.bar_chart(hist_values)
 
-# Some number in the range 0-23
-hour_to_filter = st.slider('hour', 0, 23, 17)
-filtered_data = data[data[DATE_COLUMN].dt.hour == hour_to_filter]
+def respond(conversation_history: list[BaseMessage]) -> str:
+    # Create a proper message list with system message first
+    messages = [SystemMessage(SYSTEM_PROMPT)] + conversation_history
 
-st.subheader('Map of all pickups at %s:00' % hour_to_filter)
-st.map(filtered_data)
+    # Get response from the model
+    response = llm.invoke(messages)
+
+    # Don't add response to history here - let the calling code handle it
+    # Return the response content with a newline
+    return f"{response.content}\n"
+
+
+
+
+
+
+
+
+
+
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# Tab name
+st.set_page_config(page_title='Main', page_icon='😁')
+
+st.title('Chatting')
+
+
+
+for msg in st.session_state.chat_history:
+    if isinstance(msg, HumanMessage):
+        with st.chat_message('Human'):
+            st.markdown(msg.content)
+    elif isinstance(msg, AIMessage):
+        with st.chat_message('AI'):
+            st.markdown(msg.content)
+
+
+
+
+
+
+user_query = st.chat_input('prompt...')
+
+if user_query is not None and user_query != '':
+    st.session_state.chat_history.append(HumanMessage(user_query))
+
+    with st.chat_message('Human'):
+        st.markdown(user_query)
+
+    with st.chat_message('AI'):
+        response = respond(st.session_state.chat_history)
+        st.markdown(response)
+
+    st.session_state.chat_history.append(AIMessage(response))
